@@ -9,10 +9,14 @@ from ml_collections import config_flags
 from tensorboardX import SummaryWriter
 
 import wrappers
-from dataset_utils import (Batch, D4RLDataset, ReplayBuffer,
+from dataset_utils import (Batch, D4RLDataset, ReplayBuffer, AdroitBinaryDataset,
                            split_into_trajectories)
 from evaluation import evaluate
 from learner import Learner
+import mj_envs
+from utils import (WandBLogger, get_user_flags)
+from ml_collections.config_flags import config_flags
+from ml_collections.config_dict import config_dict
 
 FLAGS = flags.FLAGS
 
@@ -32,12 +36,14 @@ flags.DEFINE_integer('replay_buffer_size', 2000000,
 flags.DEFINE_integer('init_dataset_size', None,
                      'Offline data size (uses all data if unspecified).')
 flags.DEFINE_boolean('tqdm', True, 'Use tqdm progress bar.')
+
+config_flags.DEFINE_config_dict('logging', WandBLogger.get_default_config())
+
 config_flags.DEFINE_config_file(
     'config',
     'configs/antmaze_finetune_config.py',
     'File path to the training hyperparameter configuration.',
     lock_config=False)
-
 
 def normalize(dataset):
 
@@ -71,7 +77,10 @@ def make_env_and_dataset(env_name: str,
     env.observation_space.seed(seed)
 
     print("ENV", env_name)
-    dataset = D4RLDataset(env)
+    if env_name in ["pen-binary-v0", "door-binary-v0", "relocate-binary-v0"]:
+        dataset = AdroitBinaryDataset(env)
+    else:
+        dataset = D4RLDataset(env)
 
     if 'antmaze' in FLAGS.env_name:
         # dataset.rewards -= 1.0
@@ -91,6 +100,9 @@ def main(_):
                                    write_to_disk=True)
     os.makedirs(FLAGS.save_dir, exist_ok=True)
 
+    variant = get_user_flags(FLAGS)
+    wandb_logger = WandBLogger(config=FLAGS.logging, variant=variant)
+
     env, dataset = make_env_and_dataset(FLAGS.env_name, FLAGS.seed)
 
     action_dim = env.action_space.shape[0]
@@ -98,7 +110,9 @@ def main(_):
                                  FLAGS.replay_buffer_size or FLAGS.max_steps)
     replay_buffer.initialize_with_dataset(dataset, FLAGS.init_dataset_size)
 
+
     kwargs = dict(FLAGS.config)
+    
     agent = Learner(FLAGS.seed,
                     env.observation_space.sample()[np.newaxis],
                     env.action_space.sample()[np.newaxis], **kwargs)
@@ -111,6 +125,11 @@ def main(_):
                              FLAGS.max_steps + 1),
                        smoothing=0.1,
                        disable=not FLAGS.tqdm):
+
+        # initial evaluation
+        eval_stats = evaluate(agent, env, FLAGS.eval_episodes)
+        wandb_logger.log(eval_stats, step=i-1)
+
         if i >= 1:
             action = agent.sample_actions(observation, )
             action = np.clip(action, -1, 1)
@@ -147,6 +166,7 @@ def main(_):
             for k, v in update_info.items():
                 if v.ndim == 0:
                     summary_writer.add_scalar(f'training/{k}', v, i)
+                    wandb_logger.log({f'training/{k}': v}, step=i)
                 else:
                     summary_writer.add_histogram(f'training/{k}', v, i)
             summary_writer.flush()
@@ -157,6 +177,8 @@ def main(_):
             for k, v in eval_stats.items():
                 summary_writer.add_scalar(f'evaluation/average_{k}s', v, i)
             summary_writer.flush()
+
+            wandb_logger.log(eval_stats, step=i)
 
             eval_returns.append((i, eval_stats['return']))
             np.savetxt(os.path.join(FLAGS.save_dir, f'{FLAGS.seed}.txt'),

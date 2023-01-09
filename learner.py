@@ -60,7 +60,8 @@ class Learner(object):
                  temperature: float = 0.1,
                  dropout_rate: Optional[float] = None,
                  max_steps: Optional[int] = None,
-                 opt_decay_schedule: str = "cosine"):
+                 opt_decay_schedule: str = "cosine",
+                 static_exploration_std: Optional[float] = None):
         """
         An implementation of the version of Soft-Actor-Critic described in https://arxiv.org/abs/1801.01290
         """
@@ -69,6 +70,7 @@ class Learner(object):
         self.tau = tau
         self.discount = discount
         self.temperature = temperature
+        self.static_exploration_std = static_exploration_std
 
         rng = jax.random.PRNGKey(seed)
         rng, actor_key, critic_key, value_key = jax.random.split(rng, 4)
@@ -80,7 +82,8 @@ class Learner(object):
                                             log_std_min=-5.0,
                                             dropout_rate=dropout_rate,
                                             state_dependent_std=False,
-                                            tanh_squash_distribution=False)
+                                            tanh_squash_distribution=False,
+                                            static_exploration_std=static_exploration_std)
 
         if opt_decay_schedule == "cosine":
             schedule_fn = optax.cosine_decay_schedule(-actor_lr, max_steps)
@@ -115,6 +118,7 @@ class Learner(object):
     def sample_actions(self,
                        observations: np.ndarray,
                        temperature: float = 1.0) -> jnp.ndarray:
+
         rng, actions = policy.sample_actions(self.rng, self.actor.apply_fn,
                                              self.actor.params, observations,
                                              temperature)

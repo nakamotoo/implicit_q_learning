@@ -25,12 +25,14 @@ class NormalTanhPolicy(nn.Module):
     log_std_min: Optional[float] = None
     log_std_max: Optional[float] = None
     tanh_squash_distribution: bool = True
+    static_exploration_std: Optional[float] = None
 
     @nn.compact
     def __call__(self,
                  observations: jnp.ndarray,
                  temperature: float = 1.0,
-                 training: bool = False) -> tfd.Distribution:
+                 training: bool = False,
+                 exploration_std: float=-1.0) -> tfd.Distribution:
         outputs = MLP(self.hidden_dims,
                       activate_final=True,
                       dropout_rate=self.dropout_rate)(observations,
@@ -38,14 +40,15 @@ class NormalTanhPolicy(nn.Module):
 
         means = nn.Dense(self.action_dim, kernel_init=default_init())(outputs)
 
-        if self.state_dependent_std:
+        if self.static_exploration_std:
+            log_stds = jnp.ones(shape=(self.action_dim, )) * jnp.log(self.static_exploration_std)
+        elif self.state_dependent_std:
             log_stds = nn.Dense(self.action_dim,
                                 kernel_init=default_init(
                                     self.log_std_scale))(outputs)
         else:
             log_stds = self.param('log_stds', nn.initializers.zeros,
                                   (self.action_dim, ))
-
         log_std_min = self.log_std_min or LOG_STD_MIN
         log_std_max = self.log_std_max or LOG_STD_MAX
         log_stds = jnp.clip(log_stds, log_std_min, log_std_max)
@@ -54,8 +57,8 @@ class NormalTanhPolicy(nn.Module):
             means = nn.tanh(means)
 
         base_dist = tfd.MultivariateNormalDiag(loc=means,
-                                               scale_diag=jnp.exp(log_stds) *
-                                               temperature)
+                                            scale_diag=jnp.exp(log_stds) *
+                                            temperature)
         if self.tanh_squash_distribution:
             return tfd.TransformedDistribution(distribution=base_dist,
                                                bijector=tfb.Tanh())
@@ -63,13 +66,14 @@ class NormalTanhPolicy(nn.Module):
             return base_dist
 
 
-@functools.partial(jax.jit, static_argnames=('actor_def', 'distribution'))
+# @functools.partial(jax.jit, static_argnames=('actor_def', 'distribution'))
 def _sample_actions(rng: PRNGKey,
                     actor_def: nn.Module,
                     actor_params: Params,
                     observations: np.ndarray,
-                    temperature: float = 1.0) -> Tuple[PRNGKey, jnp.ndarray]:
-    dist = actor_def.apply({'params': actor_params}, observations, temperature)
+                    temperature: float = 1.0,
+                    exploration_std: float=-1.0) -> Tuple[PRNGKey, jnp.ndarray]:
+    dist = actor_def.apply({'params': actor_params}, observations, temperature, exploration_std=exploration_std)
     rng, key = jax.random.split(rng)
     return rng, dist.sample(seed=key)
 
@@ -78,6 +82,6 @@ def sample_actions(rng: PRNGKey,
                    actor_def: nn.Module,
                    actor_params: Params,
                    observations: np.ndarray,
-                   temperature: float = 1.0) -> Tuple[PRNGKey, jnp.ndarray]:
-    return _sample_actions(rng, actor_def, actor_params, observations,
-                           temperature)
+                   temperature: float = 1.0,
+                   exploration_std: float=-1.0) -> Tuple[PRNGKey, jnp.ndarray]:
+    return _sample_actions(rng, actor_def, actor_params, observations, temperature, exploration_std=exploration_std)
