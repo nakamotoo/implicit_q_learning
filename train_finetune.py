@@ -70,6 +70,7 @@ def make_env_and_dataset(env_name: str,
     env.action_space.seed(seed)
     env.observation_space.seed(seed)
 
+    print("ENV", env_name)
     dataset = D4RLDataset(env)
 
     if 'antmaze' in FLAGS.env_name:
