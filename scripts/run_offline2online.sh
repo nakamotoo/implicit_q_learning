@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=1
 # export WANDB_DISABLED=True
 
 export XLA_PYTHON_CLIENT_PREALLOCATE=False
@@ -10,9 +10,9 @@ export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 # env=antmaze-medium-diverse-v2
 # env=antmaze-large-play-v2
 # env=antmaze-large-diverse-v2
-# env=pen-binary-v0
+env=pen-binary-v0
 # env=door-binary-v0
-env=relocate-binary-v0
+# env=relocate-binary-v0
 
 
 python train_finetune.py \
