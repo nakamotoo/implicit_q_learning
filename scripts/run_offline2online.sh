@@ -1,10 +1,8 @@
 #!/bin/bash
-
-export CUDA_VISIBLE_DEVICES=1
-# export WANDB_DISABLED=True
-
 export XLA_PYTHON_CLIENT_PREALLOCATE=False
+export CUDA_VISIBLE_DEVICES=3
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+# export WANDB_DISABLED=True
 
 # env=antmaze-medium-play-v2
 # env=antmaze-medium-diverse-v2

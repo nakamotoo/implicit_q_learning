@@ -31,8 +31,7 @@ class NormalTanhPolicy(nn.Module):
     def __call__(self,
                  observations: jnp.ndarray,
                  temperature: float = 1.0,
-                 training: bool = False,
-                 exploration_std: float=-1.0) -> tfd.Distribution:
+                 training: bool = False) -> tfd.Distribution:
         outputs = MLP(self.hidden_dims,
                       activate_final=True,
                       dropout_rate=self.dropout_rate)(observations,
@@ -71,9 +70,8 @@ def _sample_actions(rng: PRNGKey,
                     actor_def: nn.Module,
                     actor_params: Params,
                     observations: np.ndarray,
-                    temperature: float = 1.0,
-                    exploration_std: float=-1.0) -> Tuple[PRNGKey, jnp.ndarray]:
-    dist = actor_def.apply({'params': actor_params}, observations, temperature, exploration_std=exploration_std)
+                    temperature: float = 1.0) -> Tuple[PRNGKey, jnp.ndarray]:
+    dist = actor_def.apply({'params': actor_params}, observations, temperature)
     rng, key = jax.random.split(rng)
     return rng, dist.sample(seed=key)
 
@@ -82,6 +80,5 @@ def sample_actions(rng: PRNGKey,
                    actor_def: nn.Module,
                    actor_params: Params,
                    observations: np.ndarray,
-                   temperature: float = 1.0,
-                   exploration_std: float=-1.0) -> Tuple[PRNGKey, jnp.ndarray]:
-    return _sample_actions(rng, actor_def, actor_params, observations, temperature, exploration_std=exploration_std)
+                   temperature: float = 1.0) -> Tuple[PRNGKey, jnp.ndarray]:
+    return _sample_actions(rng, actor_def, actor_params, observations, temperature)

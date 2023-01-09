@@ -121,16 +121,12 @@ def main(_):
     observation, done = env.reset(), False
 
     # Use negative indices for pretraining steps.
-    for i in tqdm.tqdm(range(1 - FLAGS.num_pretraining_steps,
-                             FLAGS.max_steps + 1),
+    for i in tqdm.tqdm(range(1,FLAGS.max_steps + FLAGS.num_pretraining_steps + 1),
                        smoothing=0.1,
                        disable=not FLAGS.tqdm):
 
-        # initial evaluation
-        eval_stats = evaluate(agent, env, FLAGS.eval_episodes)
-        wandb_logger.log(eval_stats, step=i-1)
 
-        if i >= 1:
+        if i >= FLAGS.num_pretraining_steps + 1:
             action = agent.sample_actions(observation, )
             action = np.clip(action, -1, 1)
             next_observation, reward, done, info = env.step(action)
@@ -160,6 +156,12 @@ def main(_):
                           rewards=batch.rewards - 1,
                           masks=batch.masks,
                           next_observations=batch.next_observations)
+
+        # initial evaluation
+        if i == 1:
+            eval_stats = evaluate(agent, env, FLAGS.eval_episodes)
+            wandb_logger.log(eval_stats, step=0)
+        
         update_info = agent.update(batch)
 
         if i % FLAGS.log_interval == 0:
