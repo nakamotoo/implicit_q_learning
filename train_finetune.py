@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 
 import wrappers
 from dataset_utils import (Batch, D4RLDataset, ReplayBuffer, AdroitBinaryDataset,
-                           split_into_trajectories)
+                           split_into_trajectories, MixingReplayBuffer)
 from evaluation import evaluate
 from learner import Learner
 import mj_envs
@@ -36,6 +36,8 @@ flags.DEFINE_integer('replay_buffer_size', 2000000,
 flags.DEFINE_integer('init_dataset_size', None,
                      'Offline data size (uses all data if unspecified).')
 flags.DEFINE_boolean('tqdm', True, 'Use tqdm progress bar.')
+flags.DEFINE_float('mixing_ratio', -1.0, 'the ratio of offline data in the batch')
+
 
 config_flags.DEFINE_config_dict('logging', WandBLogger.get_default_config())
 
@@ -106,9 +108,16 @@ def main(_):
     env, dataset = make_env_and_dataset(FLAGS.env_name, FLAGS.seed)
 
     action_dim = env.action_space.shape[0]
-    replay_buffer = ReplayBuffer(env.observation_space, action_dim,
-                                 FLAGS.replay_buffer_size or FLAGS.max_steps)
-    replay_buffer.initialize_with_dataset(dataset, FLAGS.init_dataset_size)
+
+    if FLAGS.mixing_ratio >= 0:
+        offline_buffer = ReplayBuffer(env.observation_space, action_dim,FLAGS.replay_buffer_size)
+        offline_buffer.initialize_with_dataset(dataset, FLAGS.init_dataset_size)
+        online_buffer = ReplayBuffer(env.observation_space, action_dim,FLAGS.replay_buffer_size or FLAGS.max_steps)
+        replay_buffer = MixingReplayBuffer([offline_buffer, online_buffer], mixing_ratio=1.0)
+    else:
+        replay_buffer = ReplayBuffer(env.observation_space, action_dim,
+                                    FLAGS.replay_buffer_size or FLAGS.max_steps)
+        replay_buffer.initialize_with_dataset(dataset, FLAGS.init_dataset_size)
 
 
     kwargs = dict(FLAGS.config)
@@ -125,6 +134,8 @@ def main(_):
                        smoothing=0.1,
                        disable=not FLAGS.tqdm):
 
+        if i == FLAGS.num_pretraining_steps + 1 and FLAGS.mixing_ratio >= 0:
+            replay_buffer.set_mixing_ratio(FLAGS.mixing_ratio)
 
         if i >= FLAGS.num_pretraining_steps + 1:
             action = agent.sample_actions(observation, )

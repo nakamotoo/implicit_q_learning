@@ -13,6 +13,12 @@ Batch = collections.namedtuple(
 
 AWAC_DATA_DIR = './demonstrations/offpolicy_hand_data'
 
+def concatenate_batches(batches):
+    concatenated = {}
+    for key in batches[0]._fields:
+        concatenated[key] = np.concatenate([batch._asdict()[key] for batch in batches], axis=0).astype(np.float32)
+    return Batch(**concatenated)
+
 def split_into_trajectories(observations, actions, rewards, masks, dones_float,
                             next_observations):
     trajs = [[]]
@@ -263,3 +269,43 @@ class ReplayBuffer(Dataset):
 
         self.insert_index = (self.insert_index + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
+
+
+
+class MixingReplayBuffer():
+
+    def __init__(
+            self,
+            replay_buffers,
+            mixing_ratio
+    ):
+
+        """
+        :param replay_buffers: sample from given replay buffer with specified probability
+        """
+
+        self.replay_buffers = replay_buffers
+        self.mixing_ratio = mixing_ratio
+        assert len(replay_buffers) == 2
+
+
+    def sample(self, batch_size: int) -> Batch:
+        batches = []
+        size_offline = int(np.floor(batch_size*self.mixing_ratio))
+        sub_batch_sizes = [size_offline, batch_size - size_offline]
+        for buf, sb in zip(self.replay_buffers, sub_batch_sizes):
+            batches.append(buf.sample(sb))
+
+        return concatenate_batches(batches)
+
+    def set_mixing_ratio(self, mixing_ratio):
+        print("setting mixing ratio to:", mixing_ratio)
+        self.mixing_ratio = mixing_ratio
+
+    def insert(self, observation: np.ndarray, action: np.ndarray,
+               reward: float, mask: float, done_float: float,
+               next_observation: np.ndarray):
+        # assume 0 is offline and 1 is online buffer
+        return self.replay_buffers[1].insert(observation, action,
+               reward, mask, done_float,
+               next_observation)
