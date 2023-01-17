@@ -26,13 +26,13 @@ def target_update(critic: Model, target_critic: Model, tau: float) -> Model:
 def _update_jit(
     rng: PRNGKey, actor: Model, critic: Model, value: Model,
     target_critic: Model, batch: Batch, discount: float, tau: float,
-    expectile: float, temperature: float
+    expectile: float, temperature: float, expa_max: float
 ) -> Tuple[PRNGKey, Model, Model, Model, Model, Model, InfoDict]:
 
     new_value, value_info = update_v(target_critic, value, batch, expectile)
     key, rng = jax.random.split(rng)
     new_actor, actor_info = awr_update_actor(key, actor, target_critic,
-                                             new_value, batch, temperature)
+                                             new_value, batch, temperature, expa_max)
 
     new_critic, critic_info = update_q(critic, new_value, batch, discount)
 
@@ -61,7 +61,9 @@ class Learner(object):
                  dropout_rate: Optional[float] = None,
                  max_steps: Optional[int] = None,
                  opt_decay_schedule: str = "cosine",
-                 static_exploration_std: Optional[float] = None):
+                 static_exploration_std: Optional[float] = None,
+                 critic_hidden_dims = None
+                 ):
         """
         An implementation of the version of Soft-Actor-Critic described in https://arxiv.org/abs/1801.01290
         """
@@ -71,7 +73,7 @@ class Learner(object):
         self.discount = discount
         self.temperature = temperature
         self.static_exploration_std = static_exploration_std
-
+        self.expa_max = 100
         rng = jax.random.PRNGKey(seed)
         rng, actor_key, critic_key, value_key = jax.random.split(rng, 4)
 
@@ -96,12 +98,15 @@ class Learner(object):
                              inputs=[actor_key, observations],
                              tx=optimiser)
 
-        critic_def = value_net.DoubleCritic(hidden_dims)
+        if critic_hidden_dims is None:
+            critic_hidden_dims = hidden_dims
+
+        critic_def = value_net.DoubleCritic(critic_hidden_dims)
         critic = Model.create(critic_def,
                               inputs=[critic_key, observations, actions],
                               tx=optax.adam(learning_rate=critic_lr))
 
-        value_def = value_net.ValueCritic(hidden_dims)
+        value_def = value_net.ValueCritic(critic_hidden_dims)
         value = Model.create(value_def,
                              inputs=[value_key, observations],
                              tx=optax.adam(learning_rate=value_lr))
@@ -130,7 +135,7 @@ class Learner(object):
     def update(self, batch: Batch) -> InfoDict:
         new_rng, new_actor, new_critic, new_value, new_target_critic, info = _update_jit(
             self.rng, self.actor, self.critic, self.value, self.target_critic,
-            batch, self.discount, self.tau, self.expectile, self.temperature)
+            batch, self.discount, self.tau, self.expectile, self.temperature, self.expa_max)
 
         self.rng = new_rng
         self.actor = new_actor

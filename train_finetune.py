@@ -37,6 +37,9 @@ flags.DEFINE_integer('init_dataset_size', None,
                      'Offline data size (uses all data if unspecified).')
 flags.DEFINE_boolean('tqdm', True, 'Use tqdm progress bar.')
 flags.DEFINE_float('mixing_ratio', -1.0, 'the ratio of offline data in the batch')
+flags.DEFINE_float('online_temperature', -1.0, 'the IQL temparature for online phase')
+flags.DEFINE_float('online_expa_max', -1.0, 'the IQL temparature for online phase')
+
 
 
 config_flags.DEFINE_config_dict('logging', WandBLogger.get_default_config())
@@ -128,19 +131,30 @@ def main(_):
 
     eval_returns = []
     observation, done = env.reset(), False
+    env_steps = 0
+    grad_steps = 0
 
     # Use negative indices for pretraining steps.
     for i in tqdm.tqdm(range(1,FLAGS.max_steps + FLAGS.num_pretraining_steps + 1),
                        smoothing=0.1,
                        disable=not FLAGS.tqdm):
 
-        if i == FLAGS.num_pretraining_steps + 1 and FLAGS.mixing_ratio >= 0:
-            replay_buffer.set_mixing_ratio(FLAGS.mixing_ratio)
+        if i == FLAGS.num_pretraining_steps + 1:
+            if FLAGS.mixing_ratio >= 0:
+                replay_buffer.set_mixing_ratio(FLAGS.mixing_ratio)
+            if FLAGS.online_temperature >= 0:
+                print("changing temperature to:", FLAGS.online_temperature)
+                agent.temperature = FLAGS.online_temperature
+
+            if FLAGS.online_expa_max >= 0:
+                print("changing advantage upper limit to:", FLAGS.online_expa_max)
+                agent.expa_max=FLAGS.online_expa_max
 
         if i >= FLAGS.num_pretraining_steps + 1:
             action = agent.sample_actions(observation, )
             action = np.clip(action, -1, 1)
             next_observation, reward, done, info = env.step(action)
+            env_steps += 1
 
             if not done or 'TimeLimit.truncated' in info:
                 mask = 1.0
@@ -174,8 +188,11 @@ def main(_):
             wandb_logger.log(eval_stats, step=0)
         
         update_info = agent.update(batch)
+        grad_steps += 1
 
         if i % FLAGS.log_interval == 0:
+            wandb_logger.log({'env_steps': env_steps}, step=i)
+            wandb_logger.log({'grad_steps': grad_steps}, step=i)
             for k, v in update_info.items():
                 if v.ndim == 0:
                     summary_writer.add_scalar(f'training/{k}', v, i)
