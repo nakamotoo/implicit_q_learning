@@ -199,6 +199,15 @@ def main(_):
                     wandb_logger.log({f'training/{k}': v}, step=i)
                 else:
                     summary_writer.add_histogram(f'training/{k}', v, i)
+                    wandb_logger.log({f'training/{k}_mean': v.mean()}, step=i)
+                    wandb_logger.log({f'training/{k}_max': v.max()}, step=i)
+                    wandb_logger.log({f'training/{k}_min': v.min()}, step=i)
+                    wandb_logger.log({f'training/{k}_std': v.std()}, step=i)
+
+            additional_info = agent.log_diff_q(batch)
+            for k, v in additional_info.items():
+                wandb_logger.log({f'training/{k}': v}, step=i)
+
             summary_writer.flush()
 
         if i % FLAGS.eval_interval == 0:

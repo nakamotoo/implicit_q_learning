@@ -142,5 +142,15 @@ class Learner(object):
         self.critic = new_critic
         self.value = new_value
         self.target_critic = new_target_critic
-
         return info
+
+    def log_diff_q(self,  batch: Batch) -> InfoDict:
+        actions_pi = self.sample_actions(batch.observations)
+        q1, q2 = self.critic(batch.observations, batch.actions)
+        q1_pi, q2_pi = self.critic(batch.observations, actions_pi)
+        
+        return {"q1_pi": q1_pi.mean(),
+        "q2_pi": q2_pi.mean(),
+        "q1_diff_pi_data": (q1_pi-q1).mean(),
+        "q2_diff_pi_data": (q2_pi-q2).mean(),
+        }
