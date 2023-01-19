@@ -12,7 +12,8 @@ def update(key: PRNGKey, actor: Model, critic: Model, value: Model,
     q1, q2 = critic(batch.observations, batch.actions)
     q = jnp.minimum(q1, q2)
     exp_a = jnp.exp((q - v) * temperature)
-    exp_a = jnp.minimum(exp_a, temperature**2)
+    # exp_a = jnp.minimum(exp_a, temperature**2)
+    exp_a = jnp.minimum(exp_a, 100)
 
 
     def actor_loss_fn(actor_params: Params) -> Tuple[jnp.ndarray, InfoDict]:

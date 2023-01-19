@@ -9,7 +9,7 @@ from ml_collections import config_flags
 from tensorboardX import SummaryWriter
 
 import wrappers
-from dataset_utils import (Batch, D4RLDataset, ReplayBuffer, AdroitBinaryDataset,
+from dataset_utils import (Batch, D4RLDataset, ReplayBuffer, AdroitBinaryDataset, AdroitBinaryTruncDataset,
                            split_into_trajectories, MixingReplayBuffer)
 from evaluation import evaluate
 from learner import Learner
@@ -39,6 +39,8 @@ flags.DEFINE_boolean('tqdm', True, 'Use tqdm progress bar.')
 flags.DEFINE_float('mixing_ratio', -1.0, 'the ratio of offline data in the batch')
 flags.DEFINE_float('online_temperature', -1.0, 'the IQL temparature for online phase')
 flags.DEFINE_float('online_expa_max', -1.0, 'the IQL temparature for online phase')
+flags.DEFINE_boolean('truncate_demos', True, 'Truncate demos for Adroit or not')
+
 
 
 
@@ -83,7 +85,10 @@ def make_env_and_dataset(env_name: str,
 
     print("ENV", env_name)
     if env_name in ["pen-binary-v0", "door-binary-v0", "relocate-binary-v0"]:
-        dataset = AdroitBinaryDataset(env)
+        if FLAGS.truncate_demos:
+            dataset = AdroitBinaryTruncDataset(env)
+        else:
+            dataset = AdroitBinaryDataset(env)
     else:
         dataset = D4RLDataset(env)
 
