@@ -1,20 +1,20 @@
 #!/bin/bash
 export XLA_PYTHON_CLIENT_PREALLOCATE=False
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=7
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 # export WANDB_DISABLED=True
 
-env=antmaze-medium-play-v2
-env=antmaze-medium-diverse-v2
+# env=antmaze-medium-play-v2
+# env=antmaze-medium-diverse-v2
 # env=antmaze-large-play-v2
-# env=antmaze-large-diverse-v2
+env=antmaze-large-diverse-v2
 
 mixing_ratio=0.5
 # online_expa_max=100000
 online_temperature=10
 
 # 7 8 9
-for seed in 4 5 6
+for seed in 6
 do
 python train_finetune.py \
 --env_name=$env \
@@ -31,5 +31,4 @@ python train_finetune.py \
 --logging.project=IQL-offline2online-antmaze-final \
 --online_temperature=$online_temperature \
 --log_interval=5000
-
 done
