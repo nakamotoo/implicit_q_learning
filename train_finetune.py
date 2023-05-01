@@ -13,7 +13,6 @@ from dataset_utils import (Batch, D4RLDataset, ReplayBuffer, AdroitBinaryDataset
                            split_into_trajectories, MixingReplayBuffer)
 from evaluation import evaluate
 from learner import Learner
-import mj_envs
 from utils import (WandBLogger, get_user_flags)
 from ml_collections.config_flags import config_flags
 from ml_collections.config_dict import config_dict
@@ -112,6 +111,8 @@ def main(_):
 
     variant = get_user_flags(FLAGS)
     wandb_logger = WandBLogger(config=FLAGS.logging, variant=variant)
+    if "binary" in FLAGS.env_name:
+        import mj_envs
 
     env, dataset = make_env_and_dataset(FLAGS.env_name, FLAGS.seed)
 

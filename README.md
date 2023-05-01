@@ -54,3 +54,11 @@ python train_finetune.py --env_name=antmaze-large-play-v0 --config=configs/antma
 
 ## Misc
 The implementation is based on [JAXRL](https://github.com/ikostrikov/jaxrl).
+
+
+## Memo mitsuhiko
+```
+pip install wandb
+pip install --upgrade "jax[cuda11_local]==0.3.25" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install -U jaxlib==0.3.25+cuda11.cudnn82 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
