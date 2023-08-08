@@ -1,15 +1,20 @@
 #!/bin/bash
 export XLA_PYTHON_CLIENT_PREALLOCATE=False
-export CUDA_VISIBLE_DEVICES=0
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+export CUDA_VISIBLE_DEVICES=7
+
 # export WANDB_DISABLED=True
 
-# halfcheetah-medium-v2, halfcheetah-medium-replay-v2, halfcheetah-medium-expert-v2, halfcheetah-random-v2, halfcheetah-expoert-v2
-env=halfcheetah-medium-v2
+# halfcheetah-random-v2, halfcheetah-medium-v2, halfcheetah-medium-replay-v2, halfcheetah-medium-expert-v2, halfcheetah-expert-v2
+# hopper-random-v2, hopper-medium-v2, hopper-medium-replay-v2, hopper-medium-expert-v2, hopper-expert-v2
+# walker2d-random-v2, walker2d-medium-v2, walker2d-medium-replay-v2, walker2d-medium-expert-v2, walker2d-expert-v2
+
+env=hopper-random-v2
 
 mixing_ratio=0.5
 # online_expa_max=100000
-# online_temperature=10
+# 10 50 100
+online_temperature=100
 
 # 7 8 9
 for seed in 0 1 2
@@ -27,6 +32,6 @@ python train_finetune.py \
 --seed $seed \
 --mixing_ratio=$mixing_ratio \
 --logging.project=0806-locomotion-IQL \
+--online_temperature=$online_temperature \
 --log_interval=5000
 done
-# --online_temperature=$online_temperature \
